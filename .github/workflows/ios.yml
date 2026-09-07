@@ -1,0 +1,79 @@
+name: Build iOS IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+
+jobs:
+  build-ios:
+    runs-on: macos-14
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout app source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Download offline Rapfi engine assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/build
+          base="https://www.gomocalc.com/build"
+          curl --fail --retry 3 -L "$base/rapfi-single.js" -o public/build/rapfi-single.js
+          curl --fail --retry 3 -L "$base/rapfi-single.wasm" -o public/build/rapfi-single.wasm
+          curl --fail --retry 3 -L "$base/rapfi.data" -o public/build/rapfi.data
+
+      - name: Build web assets into the app bundle
+        env:
+          NODE_OPTIONS: --openssl-legacy-provider
+          VUE_APP_CAPACITOR: '1'
+        run: npm run build:ios
+
+      - name: Install Capacitor CLI
+        run: npm install --no-save @capacitor/core@6 @capacitor/ios@6 @capacitor/cli@6
+
+      - name: Add iOS platform
+        run: npx cap add ios
+
+      - name: Sync local web assets into iOS project
+        run: npx cap sync ios
+
+      - name: Build unsigned iOS archive
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package unsigned app bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          app_path="build/DerivedData/Build/Products/Debug-iphoneos/App.app"
+          test -d "$app_path"
+          ditto -c -k --sequesterRsrc --keepParent "$app_path" artifacts/GomokuCalculator-unsigned.app.zip
+
+      - name: Upload unsigned iOS app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: GomokuCalculator-unsigned-app
+          path: artifacts/GomokuCalculator-unsigned.app.zip
