@@ -49,7 +49,8 @@ export default new Vuex.Store({
   },
   actions: {
     async getBrowserCapabilities({ commit, rootState }) {
-      const supportThreads = await threads()
+      const supportThreads =
+        process.env.VUE_APP_CAPACITOR === '1' ? true : await threads()
       const supportSimd = await simd()
       const supportRelaxedSimd = await relaxedSimd()
       const maxThreads = supportThreads ? navigator.hardwareConcurrency : 1
