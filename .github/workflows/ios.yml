@@ -63,17 +63,21 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             build
 
-      - name: Package unsigned app bundle
+      - name: Package unsigned IPA for third-party signing
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p artifacts
           app_path="build/DerivedData/Build/Products/Debug-iphoneos/App.app"
           test -d "$app_path"
-          ditto -c -k --sequesterRsrc --keepParent "$app_path" artifacts/GomokuCalculator-unsigned.app.zip
+          rm -rf artifacts/Payload
+          mkdir -p artifacts/Payload
+          cp -R "$app_path" artifacts/Payload/App.app
+          # An unsigned IPA is a zip with the standard Payload/App.app layout.
+          ditto -c -k --sequesterRsrc --keepParent artifacts/Payload artifacts/GomokuCalculator-unsigned.ipa
 
-      - name: Upload unsigned iOS app bundle
+      - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: GomokuCalculator-unsigned-app
-          path: artifacts/GomokuCalculator-unsigned.app.zip
+          name: GomokuCalculator-unsigned-ipa
+          path: artifacts/GomokuCalculator-unsigned.ipa
