@@ -15,7 +15,15 @@ set(RAPFI_SOURCES
     core/platform.cpp core/version.cpp
     database/dbclient.cpp database/dbconfig.cpp database/dbutils.cpp
     database/dbtypes.cpp database/renlib.cpp database/yxdbstorage.cpp
-    eval/eval.cpp internalConfig.cpp)
+    eval/eval.cpp eval/evalconfig.cpp eval/evaluator.cpp
+    eval/mix9svqnnue.cpp eval/mix10nnue.cpp
+    game/board.cpp game/movegen.cpp game/pattern.cpp
+    search/hashtable.cpp search/movepick.cpp search/opening.cpp
+    search/searchcommon.cpp search/searchconfig.cpp search/searchengine.cpp
+    search/searchoutput.cpp search/searchthread.cpp search/timecontrol.cpp
+    search/ab/history.cpp search/ab/search.cpp
+    search/mcts/node.cpp search/mcts/search.cpp
+    config.cpp internalConfig.cpp)
 
 add_subdirectory(${RAPFI_SOURCE_DIR}/external/cpptoml ${CMAKE_BINARY_DIR}/cpptoml)
 add_subdirectory(${RAPFI_SOURCE_DIR}/external/cxxopts ${CMAKE_BINARY_DIR}/cxxopts)
@@ -26,6 +34,16 @@ add_library(rapfi_native STATIC ${RAPFI_SOURCES} RapfiEngineBridge.cpp)
 target_include_directories(rapfi_native PRIVATE ${RAPFI_SOURCE_DIR})
 target_compile_definitions(rapfi_native PRIVATE MULTI_THREADING NO_COMMAND_MODULES)
 target_link_libraries(rapfi_native PRIVATE cpptoml cxxopts lz4 simde)
+
+# iPad/iPhone builds are arm64. Enable the baseline ARM SIMD path; dot-product
+# is enabled by the workflow when the AppleClang toolchain supports it.
+option(USE_NEON "Enable ARM NEON" ON)
+option(USE_NEON_DOTPROD "Enable ARM NEON dot product" OFF)
+if(USE_NEON_DOTPROD)
+    target_compile_options(rapfi_native PRIVATE -march=armv8.2-a+dotprod)
+elseif(USE_NEON)
+    target_compile_options(rapfi_native PRIVATE -march=armv8-a+simd)
+endif()
 
 add_library(rapfi_plugin STATIC RapfiPlugin.m)
 target_include_directories(rapfi_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
