@@ -68,9 +68,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cap_header=$(find ios/App/Pods -path '*/Capacitor.h' -print -quit)
+          cap_header=$(find ios -type f -iname 'Capacitor.h' -print -quit)
           test -n "$cap_header"
-          cap_include=$(dirname "$(dirname "$cap_header")")
+          cap_module_dir=$(dirname "$cap_header")
+          cap_include=$(dirname "$cap_module_dir")
           cmake -S native -B native/build \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_SYSTEM_NAME=iOS \
