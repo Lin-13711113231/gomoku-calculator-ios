@@ -101,6 +101,9 @@ jobs:
           test -f "$native_lib"
           test -f "$plugin_lib"
           test -f "$lz4_lib"
+          native_lib="$GITHUB_WORKSPACE/$native_lib"
+          plugin_lib="$GITHUB_WORKSPACE/$plugin_lib"
+          lz4_lib="$GITHUB_WORKSPACE/$lz4_lib"
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
