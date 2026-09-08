@@ -1,8 +1,11 @@
 import Worker from './engine-warpper.worker.js'
 import { script } from '@/../node_modules/dynamic-import/dist/import.js'
 import { threads, simd, relaxedSimd } from 'wasm-feature-detect'
+import { registerPlugin } from '@capacitor/core'
 
-var callback, engineInstance, supportThreads, dataLoaded
+const NativeRapfi = registerPlugin('Rapfi')
+
+var callback, engineInstance, supportThreads, dataLoaded, nativeEngine
 
 function locateFile(url, engineDirURL) {
   // Redirect 'rapfi.*\.data' to 'rapfi.data'
@@ -39,8 +42,30 @@ async function init(callbackFn_, loadFullEngine) {
   dataLoaded = false
 
   const isCapacitor = process.env.VUE_APP_CAPACITOR === '1'
-  // The offline iOS bundle contains the single-threaded engine. This avoids
-  // requiring SharedArrayBuffer/COOP/COEP inside WKWebView.
+  nativeEngine = false
+
+  // Capacitor uses the native Rapfi bridge. It runs the same protocol as the
+  // web engine, but the search itself is native C++ and can use all CPU cores.
+  if (isCapacitor) {
+    let listener
+    try {
+      listener = await NativeRapfi.addListener('line', ({ line }) => onEngineStdout(line))
+      await NativeRapfi.start()
+    } catch (error) {
+      if (listener) listener.remove()
+      console.warn('[Engine] Native Rapfi unavailable, falling back to bundled WASM.', error)
+    }
+    if (listener) {
+      nativeEngine = true
+      supportThreads = true
+      dataLoaded = true
+      callback({ ok: true })
+      return 'native-rapfi'
+    }
+  }
+
+  // The fallback remains available for browser builds and for an IPA where
+  // the native plugin was not linked successfully.
   supportThreads = isCapacitor ? false : await threads()
   const supportSIMD = await simd()
   const supportRelaxedSIMD = supportThreads && (await relaxedSimd())
@@ -102,6 +127,10 @@ async function init(callbackFn_, loadFullEngine) {
 // Stop current engine's thinking process
 // Returns true if force stoped, otherwise returns false
 function stopThinking() {
+  if (nativeEngine) {
+    sendCommand('YXSTOP')
+    return false
+  }
   if (supportThreads) {
     sendCommand('YXSTOP')
     return false
@@ -116,7 +145,8 @@ function stopThinking() {
 function sendCommand(cmd) {
   if (typeof cmd !== 'string' || cmd.length == 0) return
 
-  if (supportThreads) engineInstance.sendCommand(cmd)
+  if (nativeEngine) NativeRapfi.send({ command: cmd })
+  else if (supportThreads) engineInstance.sendCommand(cmd)
   else engineInstance.postMessage({ type: 'command', data: cmd })
 }
 
