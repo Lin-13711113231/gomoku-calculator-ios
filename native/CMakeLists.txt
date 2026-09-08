@@ -59,5 +59,14 @@ endif()
 add_library(rapfi_plugin STATIC RapfiPlugin.m)
 target_include_directories(rapfi_plugin PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 if(CAPACITOR_INCLUDE_DIR)
-    target_include_directories(rapfi_plugin PRIVATE ${CAPACITOR_INCLUDE_DIR})
+    target_include_directories(rapfi_plugin PRIVATE "${CAPACITOR_INCLUDE_DIR}")
+endif()
+if(CAPACITOR_HEADER)
+    get_filename_component(CAPACITOR_MODULE_DIR "${CAPACITOR_HEADER}" DIRECTORY)
+    get_filename_component(CAPACITOR_PACKAGE_DIR "${CAPACITOR_MODULE_DIR}" DIRECTORY)
+    target_include_directories(rapfi_plugin PRIVATE
+        "${CAPACITOR_MODULE_DIR}"
+        "${CAPACITOR_PACKAGE_DIR}")
+    target_compile_definitions(rapfi_plugin PRIVATE
+        CAPACITOR_HEADER_PATH=\"${CAPACITOR_HEADER}\")
 endif()

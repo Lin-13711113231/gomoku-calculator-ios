@@ -1,4 +1,8 @@
+#if defined(CAPACITOR_HEADER_PATH)
+#import CAPACITOR_HEADER_PATH
+#else
 #import <Capacitor/Capacitor.h>
+#endif
 
 #import "RapfiEngineBridge.h"
 

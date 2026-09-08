@@ -86,7 +86,8 @@ jobs:
             -DRAPFI_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/rapfi/Rapfi" \
             -DUSE_NEON=ON \
             -DUSE_NEON_DOTPROD=ON \
-            -DCAPACITOR_INCLUDE_DIR="$cap_include"
+            -DCAPACITOR_INCLUDE_DIR="$cap_include" \
+            -DCAPACITOR_HEADER="$cap_header"
           cmake --build native/build --config Release --parallel 3
 
       - name: Build unsigned iOS archive
