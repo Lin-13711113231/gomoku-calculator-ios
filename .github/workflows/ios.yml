@@ -68,8 +68,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cap_header=$(find ios -type f -iname 'Capacitor.h' -print -quit)
-          test -n "$cap_header"
+          cap_header=$(find ios node_modules/@capacitor -type f -iname 'Capacitor.h' -print -quit 2>/dev/null || true)
+          if [[ -z "$cap_header" ]]; then
+            echo 'Capacitor.h was not found. Candidate Capacitor files:'
+            find ios node_modules/@capacitor -type f \( -iname '*capacitor*.h' -o -path '*Capacitor.framework/Headers/*' \) -print 2>/dev/null | head -50 || true
+            exit 1
+          fi
+          echo "Using Capacitor header: $cap_header"
           cap_module_dir=$(dirname "$cap_header")
           cap_include=$(dirname "$cap_module_dir")
           cmake -S native -B native/build \
