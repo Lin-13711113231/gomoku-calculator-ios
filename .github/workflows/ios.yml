@@ -74,6 +74,7 @@ jobs:
             find ios node_modules/@capacitor -type f \( -iname '*capacitor*.h' -o -path '*Capacitor.framework/Headers/*' \) -print 2>/dev/null | head -50 || true
             exit 1
           fi
+          cap_header="$GITHUB_WORKSPACE/$cap_header"
           echo "Using Capacitor header: $cap_header"
           cap_module_dir=$(dirname "$cap_header")
           cap_include=$(dirname "$cap_module_dir")
