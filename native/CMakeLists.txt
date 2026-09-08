@@ -25,6 +25,11 @@ set(RAPFI_SOURCES
     search/mcts/node.cpp search/mcts/search.cpp
     config.cpp internalConfig.cpp)
 
+# This project lives in native/, while the sources above live in the separately
+# checked-out Rapfi tree. Convert the list before passing it to add_library so
+# CMake does not look for e.g. native/command/argutils.cpp.
+list(TRANSFORM RAPFI_SOURCES PREPEND "${RAPFI_SOURCE_DIR}/")
+
 add_subdirectory(${RAPFI_SOURCE_DIR}/external/cpptoml ${CMAKE_BINARY_DIR}/cpptoml)
 add_subdirectory(${RAPFI_SOURCE_DIR}/external/cxxopts ${CMAKE_BINARY_DIR}/cxxopts)
 add_subdirectory(${RAPFI_SOURCE_DIR}/external/lz4 ${CMAKE_BINARY_DIR}/lz4)
@@ -35,13 +40,19 @@ target_include_directories(rapfi_native PRIVATE ${RAPFI_SOURCE_DIR})
 target_compile_definitions(rapfi_native PRIVATE MULTI_THREADING NO_COMMAND_MODULES)
 target_link_libraries(rapfi_native PRIVATE cpptoml cxxopts lz4 simde)
 
+if(APPLE)
+    target_link_libraries(rapfi_native PRIVATE pthread)
+endif()
+
 # iPad/iPhone builds are arm64. Enable the baseline ARM SIMD path; dot-product
 # is enabled by the workflow when the AppleClang toolchain supports it.
 option(USE_NEON "Enable ARM NEON" ON)
 option(USE_NEON_DOTPROD "Enable ARM NEON dot product" OFF)
 if(USE_NEON_DOTPROD)
+    target_compile_definitions(rapfi_native PRIVATE USE_NEON USE_NEON_DOTPROD)
     target_compile_options(rapfi_native PRIVATE -march=armv8.2-a+dotprod)
 elseif(USE_NEON)
+    target_compile_definitions(rapfi_native PRIVATE USE_NEON)
     target_compile_options(rapfi_native PRIVATE -march=armv8-a+simd)
 endif()
 
