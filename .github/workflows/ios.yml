@@ -118,19 +118,9 @@ jobs:
           target = project.targets.find { |candidate| candidate.name == 'App' }
           raise 'Unable to find the App target' unless target
 
-          app_group = project.main_group.groups.find { |group| group.display_name == 'App' }
-          raise 'Unable to find the App source group' unless app_group
-          native_group = app_group.groups.find { |group| group.display_name == 'NativeLibs' }
-          native_group ||= app_group.new_group('NativeLibs', 'NativeLibs')
-
-          %w[librapfi_plugin.a librapfi_native.a liblz4.a].each do |library|
-            reference = native_group.files.find { |file| file.path == library }
-            reference ||= native_group.new_file(library)
-            unless target.frameworks_build_phase.files_references.include?(reference)
-              target.frameworks_build_phase.add_file_reference(reference, true)
-            end
-          end
-
+          # The paths below are passed directly to the linker.  Do not add
+          # archive file references to the build phase: Xcode would also add
+          # implicit -lrapfi_* flags without a matching library search path.
           linker_flags = '$(inherited) -ObjC -force_load "$(SRCROOT)/App/NativeLibs/librapfi_plugin.a" -force_load "$(SRCROOT)/App/NativeLibs/librapfi_native.a" "$(SRCROOT)/App/NativeLibs/liblz4.a" -lc++'
           target.build_configurations.each do |configuration|
             configuration.build_settings['OTHER_LDFLAGS'] = linker_flags
