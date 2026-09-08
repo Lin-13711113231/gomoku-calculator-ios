@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import Worker from './engine-warpper.worker.js'
 import { script } from '@/../node_modules/dynamic-import/dist/import.js'
 import { threads, simd, relaxedSimd } from 'wasm-feature-detect'
