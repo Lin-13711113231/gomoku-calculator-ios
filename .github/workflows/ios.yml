@@ -83,6 +83,7 @@ jobs:
             -DCMAKE_SYSTEM_NAME=iOS \
             -DCMAKE_OSX_SYSROOT=iphoneos \
             -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0 \
             -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
             -DRAPFI_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/rapfi/Rapfi" \
             -DUSE_NEON=ON \
@@ -91,7 +92,7 @@ jobs:
             -DCAPACITOR_HEADER="$cap_header"
           cmake --build native/build --config Release --parallel 3
 
-      - name: Build unsigned iOS archive
+      - name: Link native Rapfi libraries to the App target
         shell: bash
         run: |
           set -euo pipefail
@@ -101,9 +102,47 @@ jobs:
           test -f "$native_lib"
           test -f "$plugin_lib"
           test -f "$lz4_lib"
-          native_lib="$GITHUB_WORKSPACE/$native_lib"
-          plugin_lib="$GITHUB_WORKSPACE/$plugin_lib"
-          lz4_lib="$GITHUB_WORKSPACE/$lz4_lib"
+          mkdir -p ios/App/App/NativeLibs
+          cp "$plugin_lib" ios/App/App/NativeLibs/librapfi_plugin.a
+          cp "$native_lib" ios/App/App/NativeLibs/librapfi_native.a
+          cp "$lz4_lib" ios/App/App/NativeLibs/liblz4.a
+
+          # Command-line OTHER_LDFLAGS are inherited by CocoaPods targets,
+          # including Cordova, which does not link Capacitor. Add these only
+          # to the generated App target instead.
+          gem install xcodeproj --no-document
+          ruby <<'RUBY'
+          require 'xcodeproj'
+
+          project = Xcodeproj::Project.open('ios/App/App.xcodeproj')
+          target = project.targets.find { |candidate| candidate.name == 'App' }
+          raise 'Unable to find the App target' unless target
+
+          app_group = project.main_group.groups.find { |group| group.display_name == 'App' }
+          raise 'Unable to find the App source group' unless app_group
+          native_group = app_group.groups.find { |group| group.display_name == 'NativeLibs' }
+          native_group ||= app_group.new_group('NativeLibs', 'NativeLibs')
+
+          %w[librapfi_plugin.a librapfi_native.a liblz4.a].each do |library|
+            reference = native_group.files.find { |file| file.path == library }
+            reference ||= native_group.new_file(library)
+            unless target.frameworks_build_phase.files_references.include?(reference)
+              target.frameworks_build_phase.add_file_reference(reference, true)
+            end
+          end
+
+          linker_flags = '$(inherited) -ObjC -force_load "$(SRCROOT)/App/NativeLibs/librapfi_plugin.a" -force_load "$(SRCROOT)/App/NativeLibs/librapfi_native.a" "$(SRCROOT)/App/NativeLibs/liblz4.a" -lc++'
+          target.build_configurations.each do |configuration|
+            configuration.build_settings['OTHER_LDFLAGS'] = linker_flags
+            configuration.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
+          end
+          project.save
+          RUBY
+
+      - name: Build unsigned iOS archive
+        shell: bash
+        run: |
+          set -euo pipefail
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
             -scheme App \
@@ -111,7 +150,6 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/DerivedData \
-            OTHER_LDFLAGS='$(inherited) -ObjC -force_load '"$plugin_lib"' -force_load '"$native_lib"' '"$lz4_lib"' -lc++' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
