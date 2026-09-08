@@ -25,6 +25,9 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      - name: Install Capacitor core for native bridge import
+        run: npm install --no-save @capacitor/core@6
+
       - name: Download web fallback assets
         shell: bash
         run: |
@@ -68,7 +71,16 @@ jobs:
           cap_header=$(find ios/App/Pods -path '*/Capacitor.h' -print -quit)
           test -n "$cap_header"
           cap_include=$(dirname "$(dirname "$cap_header")")
-          cmake -S native -B native/build             -DCMAKE_BUILD_TYPE=Release             -DCMAKE_SYSTEM_NAME=iOS             -DCMAKE_OSX_SYSROOT=iphoneos             -DCMAKE_OSX_ARCHITECTURES=arm64             -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY             -DRAPFI_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/rapfi/Rapfi"             -DUSE_NEON=ON             -DUSE_NEON_DOTPROD=ON             -DCAPACITOR_INCLUDE_DIR="$cap_include"
+          cmake -S native -B native/build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT=iphoneos \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+            -DRAPFI_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/rapfi/Rapfi" \
+            -DUSE_NEON=ON \
+            -DUSE_NEON_DOTPROD=ON \
+            -DCAPACITOR_INCLUDE_DIR="$cap_include"
           cmake --build native/build --config Release --parallel 3
 
       - name: Build unsigned iOS archive
@@ -81,7 +93,17 @@ jobs:
           test -f "$native_lib"
           test -f "$plugin_lib"
           test -f "$lz4_lib"
-          xcodebuild             -workspace ios/App/App.xcworkspace             -scheme App             -configuration Debug             -sdk iphoneos             -destination 'generic/platform=iOS'             -derivedDataPath build/DerivedData             OTHER_LDFLAGS='$(inherited) -ObjC -force_load '"$plugin_lib"' -force_load '"$native_lib"' '"$lz4_lib"' -lc++'             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             build
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DerivedData \
+            OTHER_LDFLAGS='$(inherited) -ObjC -force_load '"$plugin_lib"' -force_load '"$native_lib"' '"$lz4_lib"' -lc++' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
 
       - name: Package unsigned IPA for third-party signing
         shell: bash
